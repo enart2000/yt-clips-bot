@@ -1,1 +1,1 @@
-# yt-clips-bot
+# YouTube -> Discord Bot
