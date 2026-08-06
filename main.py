@@ -1,6 +1,14 @@
 import os
 import time
+import threading
 import requests
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot działa 24/7!"
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
@@ -30,8 +38,14 @@ def check_new_clips():
     except Exception as e:
         print(f"[!] Błąd: {e}")
 
-if __name__ == "__main__":
+def loop():
     print("🚀 Bot do klipów wystartował!")
     while True:
         check_new_clips()
-        time.sleep(60)  
+        time.sleep(60)
+
+threading.Thread(target=loop, daemon=True).start()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
