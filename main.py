@@ -11,16 +11,28 @@ def home():
     return "Bot działa 24/7!"
 
 PLAYLISTS = [
-    {"name": "petarda", "id": "PLK9pErdOuahs", "file": "last_id_1.txt"},
-    {"name": "mati", "id": "PLRbpSD4BjGPw", "file": "last_id_2.txt"},
-    {"name": "enart", "id": "PLJ77qM8QV3tQ", "file": "last_id_3.txt"},
+    {"name": "petarda", "id": "PLK9pErdOuahs", "file": "sent_ids_1.txt"},
+    {"name": "mati",    "id": "PLRbpSD4BjGPw", "file": "sent_ids_2.txt"},
+    {"name": "enart",   "id": "PLJ77qM8QV3tQ", "file": "sent_ids_3.txt"},
 ]
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
+def load_sent_ids(file_path):
+    """Wczytuje z pliku historię wszystkich już wysłanych ID filmów."""
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def save_sent_id(file_path, video_id):
+    """Dopisuje nowy ID filmu do historii."""
+    with open(file_path, "a") as f:
+        f.write(f"{video_id}\n")
+
 def check_playlist(player_name, playlist_id, storage_file):
-    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={playlist_id}&maxResults=1&key={YOUTUBE_API_KEY}"
+    url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={playlist_id}&maxResults=50&key={YOUTUBE_API_KEY}"
     try:
         res = requests.get(url).json()
         
@@ -29,28 +41,35 @@ def check_playlist(player_name, playlist_id, storage_file):
             return
 
         if "items" in res and res["items"]:
-            latest_video = res["items"][0]["snippet"]
-            video_id = latest_video["resourceId"]["videoId"]
-            title = latest_video.get("title", "Nowy klip")
-            video_url = f"https://youtu.be/{video_id}"
+            sent_ids = load_sent_ids(storage_file)
             
-            last_id = ""
-            if os.path.exists(storage_file):
-                with open(storage_file, "r") as f:
-                    last_id = f.read().strip()
+            items = list(reversed(res["items"]))
+            new_found = False
+
+            for item in items:
+                snippet = item["snippet"]
+                video_id = snippet["resourceId"]["videoId"]
+                title = snippet.get("title", "Nowy klip")
+
+                if title in ["Deleted video", "Private video"]:
+                    continue
+
+                if video_id not in sent_ids:
+                    new_found = True
+                    video_url = f"https://youtu.be/{video_id}"
+                    print(f"[+] Nowy klip od {player_name}! Wysyłam na Discorda: {video_url}")
                     
-            if video_id != last_id:
-                print(f"[+] Nowy klip od {player_name}! Wysyłam na Discorda: {video_url}")
-                
-                message = f"**{player_name}** dodał nowe vidijo!\n{video_url}"
-                
-                webhook_res = requests.post(WEBHOOK_URL, json={"content": message})
-                print(f"[+] Status Discord Webhooka ({player_name}): {webhook_res.status_code}")
-                
-                with open(storage_file, "w") as f:
-                    f.write(video_id)
-            else:
-                print(f"[-] Baza aktualna dla {player_name} ('{title}')")
+                    message = f"**{player_name}** dodał nowe vidijo!\n{video_url}"
+                    
+                    webhook_res = requests.post(WEBHOOK_URL, json={"content": message})
+                    print(f"[+] Status Discord Webhooka ({player_name}): {webhook_res.status_code}")
+                    
+                    save_sent_id(storage_file, video_id)
+                    sent_ids.add(video_id)
+                    time.sleep(1)  
+
+            if not new_found:
+                print(f"[-] Brak nowych filmów u {player_name}.")
         else:
             print(f"[-] Playlista gracza {player_name} jest pusta.")
     except Exception as e:
@@ -61,10 +80,10 @@ def check_all_clips():
         check_playlist(player["name"], player["id"], player["file"])
 
 def loop():
-    print("🚀 Bot startuje (obsługa 3 playlist)...")
+    print("🚀 Bot startuje (sprawdzanie co 30 sek, max 50 filmów)...")
     while True:
         check_all_clips()
-        time.sleep(60)
+        time.sleep(30)  
 
 threading.Thread(target=loop, daemon=True).start()
 
