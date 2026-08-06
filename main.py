@@ -12,7 +12,7 @@ def home():
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
-PLAYLIST_ID = "UUmAle3PfyFItqxLjlbTev-w"
+PLAYLIST_ID = "PLay5QSQwkdl4"
 
 def check_new_clips():
     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={PLAYLIST_ID}&maxResults=1&key={YOUTUBE_API_KEY}"
