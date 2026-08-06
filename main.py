@@ -20,14 +20,17 @@ WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK")
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
 def load_sent_ids(file_path):
-    """Wczytuje z pliku historię wszystkich już wysłanych ID filmów."""
     if os.path.exists(file_path):
         with open(file_path, "r") as f:
             return set(line.strip() for line in f if line.strip())
-    return set()
+    return None
+
+def save_sent_ids_bulk(file_path, video_ids):
+    with open(file_path, "w") as f:
+        for vid in video_ids:
+            f.write(f"{vid}\n")
 
 def save_sent_id(file_path, video_id):
-    """Dopisuje nowy ID filmu do historii."""
     with open(file_path, "a") as f:
         f.write(f"{video_id}\n")
 
@@ -42,7 +45,19 @@ def check_playlist(player_name, playlist_id, storage_file):
 
         if "items" in res and res["items"]:
             sent_ids = load_sent_ids(storage_file)
-            
+            current_video_ids = []
+
+            for item in res["items"]:
+                snippet = item["snippet"]
+                title = snippet.get("title", "Nowy klip")
+                if title not in ["Deleted video", "Private video"]:
+                    current_video_ids.append(snippet["resourceId"]["videoId"])
+
+            if sent_ids is None:
+                print(f"[*] Inicjalizacja dla {player_name}. Zapisuję {len(current_video_ids)} pozycji.")
+                save_sent_ids_bulk(storage_file, current_video_ids)
+                return
+
             items = list(reversed(res["items"]))
             new_found = False
 
@@ -66,7 +81,7 @@ def check_playlist(player_name, playlist_id, storage_file):
                     
                     save_sent_id(storage_file, video_id)
                     sent_ids.add(video_id)
-                    time.sleep(1)  
+                    time.sleep(1)
 
             if not new_found:
                 print(f"[-] Brak nowych filmów u {player_name}.")
@@ -80,10 +95,10 @@ def check_all_clips():
         check_playlist(player["name"], player["id"], player["file"])
 
 def loop():
-    print("🚀 Bot startuje (sprawdzanie co 30 sek, max 50 filmów)...")
+    print("🚀 Bot startuje...")
     while True:
         check_all_clips()
-        time.sleep(30)  
+        time.sleep(30)
 
 threading.Thread(target=loop, daemon=True).start()
 
