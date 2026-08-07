@@ -60,6 +60,9 @@ def check_playlist(player_name, playlist_id, storage_file):
             return
 
         if "items" in res and res["items"]:
+            latest_title = res["items"][0]["snippet"].get("title", "Brak tytułu")
+            print(f"[*] API pobrało dla {player_name} ({len(res['items'])} filmów). Najnowszy na liście: '{latest_title}'")
+
             sent_ids = load_sent_ids(storage_file)
             current_video_ids = []
 
