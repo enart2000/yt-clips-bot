@@ -1,14 +1,6 @@
 import os
 import time
-import threading
 import requests
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot działa 24/7!"
 
 PLAYLISTS = [
     {"name": "petarda", "id": "PLK9pErdOuahs", "file": "sent_ids_1.txt"},
@@ -102,7 +94,7 @@ def check_playlist(player_name, playlist_id, storage_file):
                 if video_id not in sent_ids:
                     new_found = True
                     video_url = f"https://youtu.be/{video_id}"
-                    print(f"[+] Nowy klip od {player_name}! Proba wysyłki: {video_url}")
+                    print(f"[+] Nowy klip od {player_name}! Próba wysyłki: {video_url}")
                     
                     message = f"**{player_name}** dodał nowe vidijo!\n{video_url}"
                     
@@ -123,14 +115,8 @@ def check_all_clips():
     for player in PLAYLISTS:
         check_playlist(player["name"], player["id"], player["file"])
 
-def loop():
-    print("🚀 Bot startuje...")
+if __name__ == "__main__":
+    print("🚀 Bot startuje na serwerze dedykowanym...")
     while True:
         check_all_clips()
         time.sleep(30)
-
-threading.Thread(target=loop, daemon=True).start()
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
