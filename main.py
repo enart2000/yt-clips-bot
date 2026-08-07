@@ -34,6 +34,22 @@ def save_sent_id(file_path, video_id):
     with open(file_path, "a") as f:
         f.write(f"{video_id}\n")
 
+def send_to_discord(message):
+    if not WEBHOOK_URL:
+        print("[!] BŁĄD: Zmienna DISCORD_WEBHOOK nie jest ustawiona!")
+        return False
+    try:
+        response = requests.post(WEBHOOK_URL, json={"content": message})
+        if response.status_code in [200, 204]:
+            print(f"[+] Discord przyjął wiadomość (Status {response.status_code})")
+            return True
+        else:
+            print(f"[!] BŁĄD DISCORDA Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[!] Wyjątek podczas połączenia z Discordem: {e}")
+        return False
+
 def check_playlist(player_name, playlist_id, storage_file):
     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={playlist_id}&maxResults=50&key={YOUTUBE_API_KEY}"
     try:
@@ -76,11 +92,12 @@ def check_playlist(player_name, playlist_id, storage_file):
                     
                     message = f"**{player_name}** dodał nowe vidijo!\n{video_url}"
                     
-                    webhook_res = requests.post(WEBHOOK_URL, json={"content": message})
-                    print(f"[+] Status Discord Webhooka ({player_name}): {webhook_res.status_code}")
-                    
-                    save_sent_id(storage_file, video_id)
-                    sent_ids.add(video_id)
+                    if send_to_discord(message):
+                        save_sent_id(storage_file, video_id)
+                        sent_ids.add(video_id)
+                    else:
+                        print(f"[!] Nie zapisano ID {video_id} – ponowię próbę przy kolejnym skanie.")
+                        
                     time.sleep(1)
 
             if not new_found:
