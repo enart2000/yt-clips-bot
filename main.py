@@ -34,21 +34,32 @@ def save_sent_id(file_path, video_id):
     with open(file_path, "a") as f:
         f.write(f"{video_id}\n")
 
-def send_to_discord(message):
+def send_to_discord(message, video_url):
     if not WEBHOOK_URL:
         print("[!] BŁĄD: Zmienna DISCORD_WEBHOOK nie jest ustawiona!")
         return False
-    try:
-        response = requests.post(WEBHOOK_URL, json={"content": message})
-        if response.status_code in [200, 204]:
-            print(f"[+] Discord przyjął wiadomość (Status {response.status_code})")
-            return True
-        else:
-            print(f"[!] BŁĄD DISCORDA Status {response.status_code}: {response.text}")
-            return False
-    except Exception as e:
-        print(f"[!] Wyjątek podczas połączenia z Discordem: {e}")
-        return False
+        
+    attempt = 1
+    while True:
+        try:
+            response = requests.post(WEBHOOK_URL, json={"content": message})
+            
+            if response.status_code in [200, 204]:
+                print(f"[+] Discord przyjął wiadomość (Status {response.status_code})")
+                return True
+            elif response.status_code == 429:
+                data = response.json()
+                retry_after = data.get("retry_after", 5)
+                print(f"[⏳] KLIP OCZEKUJE NA WYSŁANIE ({video_url}) - Discord Rate Limit (429)! Czekam {retry_after} sek... (Próba #{attempt})")
+                time.sleep(retry_after)
+            else:
+                print(f"[⏳] KLIP OCZEKUJE NA WYSŁANIE ({video_url}) - Błąd Discorda (Status {response.status_code}). Ponawiam za 5 sek... (Próba #{attempt})")
+                time.sleep(5)
+        except Exception as e:
+            print(f"[⏳] KLIP OCZEKUJE NA WYSŁANIE ({video_url}) - Wyjątek połączenia: {e}. Ponawiam za 5 sek... (Próba #{attempt})")
+            time.sleep(5)
+            
+        attempt += 1
 
 def check_playlist(player_name, playlist_id, storage_file):
     url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={playlist_id}&maxResults=50&key={YOUTUBE_API_KEY}"
@@ -91,16 +102,14 @@ def check_playlist(player_name, playlist_id, storage_file):
                 if video_id not in sent_ids:
                     new_found = True
                     video_url = f"https://youtu.be/{video_id}"
-                    print(f"[+] Nowy klip od {player_name}! Wysyłam na Discorda: {video_url}")
+                    print(f"[+] Nowy klip od {player_name}! Proba wysyłki: {video_url}")
                     
                     message = f"**{player_name}** dodał nowe vidijo!\n{video_url}"
                     
-                    if send_to_discord(message):
+                    if send_to_discord(message, video_url):
                         save_sent_id(storage_file, video_id)
                         sent_ids.add(video_id)
-                    else:
-                        print(f"[!] Nie zapisano ID {video_id} – ponowię próbę przy kolejnym skanie.")
-                        
+                    
                     time.sleep(1)
 
             if not new_found:
